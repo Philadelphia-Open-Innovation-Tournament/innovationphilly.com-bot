@@ -10,22 +10,28 @@ function sanitizeAndTruncateText(text: string): string {
   text = text.replace(/\n{3,}/g, '\n\n');
   // Trim whitespace
   text = text.trim();
-
   return text;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://innovationphilly.com",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // Set CORS headers
-    const headers = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
-
     // Handle CORS preflight requests
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers });
+      return new Response(null, {
+        headers: corsHeaders
+      });
+    }
+
+    // Check if the request is coming from the allowed origin
+    const origin = request.headers.get("Origin");
+    if (origin !== "https://innovationphilly.com") {
+      return new Response("Forbidden", { status: 403 });
     }
 
     if (request.method === "POST") {
@@ -33,6 +39,7 @@ export default {
         const { noun, adjective, verb } = await request.json();
 
         const prompt = `Generate 5 creative and slightly humorous ideas for innovative projects using these inputs:
+
         Noun: ${noun}
         Adjective: ${adjective}
         Verb: ${verb}
@@ -40,6 +47,7 @@ export default {
         For each idea, incorporate the noun as the focus, the adjective as a unique quality, and the verb as the main action. Be witty and concise.
 
         Format your response as a numbered list:
+
         1. [First idea]
         2. [Second idea]
         3. [Third idea]
@@ -58,17 +66,21 @@ export default {
         const processedText = sanitizeAndTruncateText(response.response);
 
         return new Response(JSON.stringify({ ideas: processedText }), {
-          headers: { ...headers, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+
       } catch (error) {
         return new Response(JSON.stringify({ error: "Failed to generate ideas" }), {
           status: 500,
-          headers: { ...headers, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
-    return new Response("Method not allowed", { status: 405, headers });
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: corsHeaders
+    });
   },
 } satisfies ExportedHandler<Env>;
 
